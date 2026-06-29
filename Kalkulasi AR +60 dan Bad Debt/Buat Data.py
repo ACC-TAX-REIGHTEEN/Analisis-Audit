@@ -45,7 +45,7 @@ if not valid_sheets:
     print("--> Tidak ada sheet bulanan (format MMYY) yang valid di file PTM.")
     exit()
 
-id_months = {1:"Jul", 2:"Feb", 3:"Mar", 4:"Apr", 5:"Mei", 6:"Jun", 
+id_months = {1:"Jan", 2:"Feb", 3:"Mar", 4:"Apr", 5:"Mei", 6:"Jun", 
              7:"Jul", 8:"Agu", 9:"Sep", 10:"Okt", 11:"Nov", 12:"Des"}
 
 def clean_key(s):

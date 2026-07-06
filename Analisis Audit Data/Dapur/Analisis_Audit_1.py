@@ -8,9 +8,16 @@ import openpyxl
 from openpyxl.utils.dataframe import dataframe_to_rows
 from openpyxl.utils import get_column_letter
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+from openpyxl.drawing.image import Image as OpenpyxlImage
 import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from matplotlib.ticker import FuncFormatter
 
-print("--> Memulai pemrosesan data audit analytics ...")
+sns.set_theme(style="whitegrid")
+plt.rcParams['font.family'] = 'sans-serif'
+
+print("--> Memulai pemrosesan data audit analisis ...")
 
 config_file = "config.conf"
 if not os.path.exists(config_file):
@@ -192,7 +199,26 @@ formats_s1 = {
 }
 format_sheet_table(ws1, 4, headers_s1, matrix_s1, formats_s1)
 
-print("--> Menyusun Sheet 3: Deteksi Statistik Z-Score...")
+fig, ax1 = plt.subplots(figsize=(10, 5))
+ax2 = ax1.twinx()
+sns.barplot(x="Bulan", y="Total_AR_Outstanding", data=df_macro_calc, ax=ax1, color="#366092", alpha=0.6)
+sns.lineplot(x=df_macro_calc["Bulan"], y=df_macro_calc["Rasio_AR_60_Up%"]*100, ax=ax2, color="#E26B0A", marker="o", linewidth=2, label="Rasio 60+ (%)")
+sns.lineplot(x=df_macro_calc["Bulan"], y=df_macro_calc["Rasio_Bad_Debt%"]*100, ax=ax2, color="#C00000", marker="s", linewidth=2, label="Rasio Bad Debt (%)")
+ax1.set_title("Tren Saldo AR Outstanding vs Rasio Penurunan Kualitas Kredit", fontsize=12, fontweight='bold', pad=10, color="#1F497D")
+ax1.set_xlabel("Bulan Transaksi", fontweight='bold')
+ax1.set_ylabel("Total AR (IDR)", fontweight='bold')
+ax2.set_ylabel("Rasio Kontribusi (%)", fontweight='bold')
+ax1.get_yaxis().set_major_formatter(FuncFormatter(lambda x, p: f"{x:,.0f}"))
+ax2.get_yaxis().set_major_formatter(FuncFormatter(lambda x, p: f"{x:.1f}%"))
+ax2.legend(loc="upper left")
+plt.tight_layout()
+chart1_path = "temp_chart_macro_trend.png"
+plt.savefig(chart1_path, dpi=120)
+plt.close()
+
+ws1.add_image(OpenpyxlImage(chart1_path), f"B{ws1.max_row + 3}")
+
+print("--> Menyusun Sheet 2: Deteksi Statistik Z-Score...")
 ws2 = wb_new.create_sheet(title="2. Anomali Z-Score Makro")
 ws2.append(["2. LAPORAN DETEKSI ANOMALI STATISTIK (METODE Z-SCORE)"])
 ws2.cell(row=1, column=1).font = font_title
@@ -218,6 +244,23 @@ for r_idx in range(5, ws2.max_row + 1):
         for c_idx in range(1, 5):
             ws2.cell(row=r_idx, column=c_idx).fill = fill_anomaly
             ws2.cell(row=r_idx, column=c_idx).font = font_bold
+
+plt.figure(figsize=(10, 4))
+bar_colors = ['#C00000' if stat == "ANOMALI / REVIU MENDALAM" else '#366092' for stat in df_macro_calc["Status_Audit"]]
+sns.barplot(x="Bulan", y="Z_Score", data=df_macro_calc, hue="Bulan", palette=bar_colors, legend=False)
+plt.axhline(y=1.2, color='#C00000', linestyle='--', linewidth=1.2, label='Batas Atas Toleransi (+1.2 Z)')
+plt.axhline(y=-1.2, color='#C00000', linestyle='--', linewidth=1.2, label='Batas Bawah Toleransi (-1.2 Z)')
+plt.axhline(y=0, color='black', linewidth=0.8)
+plt.title("Peta Deteksi Batas Anomali Saldo Bulanan Berdasarkan Skor Z", fontsize=12, fontweight='bold', pad=10, color="#1F497D")
+plt.ylabel("Skor Z (Deviasi)", fontweight='bold')
+plt.xlabel("Bulan", fontweight='bold')
+plt.legend(loc="upper right")
+plt.tight_layout()
+chart2_path = "temp_chart_zscore.png"
+plt.savefig(chart2_path, dpi=120)
+plt.close()
+
+ws2.add_image(OpenpyxlImage(chart2_path), f"B{ws2.max_row + 3}")
 
 print("--> Menyusun Sheet 3: Forensik Digit Angka Hukum Benford...")
 ws3 = wb_new.create_sheet(title="3. Forensik Hukum Benford")
@@ -276,6 +319,25 @@ for row_data in matrix_s3:
             cell.fill = fill_anomaly
             cell.font = font_bold
 
+if total_benford_count > 0:
+    df_plot_bf = pd.DataFrame({
+        'Digit': [f"Digit {d}" for d in range(1, 10)],
+        'Proporsi Riil (%)': [matrix_s3[d-1][1]*100 for d in range(1, 10)],
+        'Teori Benford (%)': [matrix_s3[d-1][2]*100 for d in range(1, 10)]
+    }).melt(id_vars="Digit", var_name="Kategori", value_name="Persentase")
+    
+    plt.figure(figsize=(10, 4.5))
+    sns.barplot(x="Digit", y="Persentase", hue="Kategori", data=df_plot_bf, palette=["#E26B0A", "#366092"])
+    plt.title("Analisis Uji Forensik Frekuensi Angka Pertama vs Pola Teoretis Benford", fontsize=12, fontweight='bold', pad=10, color="#1F497D")
+    plt.ylabel("Persentase Kemunculan (%)", fontweight='bold')
+    plt.xlabel("Digit Pertama", fontweight='bold')
+    plt.tight_layout()
+    chart3_path = "temp_chart_benford.png"
+    plt.savefig(chart3_path, dpi=120)
+    plt.close()
+    
+    ws3.add_image(OpenpyxlImage(chart3_path), f"B{ws3.max_row + 3}")
+
 print("--> Menyusun Sheet 4: Kosentrasi Risiko Piutang Hukum Pareto...")
 ws4 = wb_new.create_sheet(title="4. Risiko Pareto Customer")
 ws4.append(["4. ANALISIS KONSENTRASI RISIKO PIUTANG (HUKUM PARETO 80/20)"])
@@ -327,6 +389,36 @@ for row_data in top_25_cust:
             cell.fill = fill_anomaly
             cell.font = font_bold
 
+if not df_cust_risk.empty:
+    df_chart_pareto = df_cust_risk.head(20).copy()
+    df_chart_pareto["Short_Name"] = df_chart_pareto["Cleaned_Cust_ID"].astype(str).apply(lambda x: x[:12]+"..." if len(x)>12 else x)
+    
+    fig, ax1 = plt.subplots(figsize=(11, 5))
+    ax2 = ax1.twinx()
+    sns.barplot(x="Short_Name", y="Cleaned_Sisa_Piutang", data=df_chart_pareto, ax=ax1, color="#366092", alpha=0.7)
+    sns.lineplot(x=df_chart_pareto["Short_Name"], y=df_chart_pareto["Kumulatif%"]*100, ax=ax2, color="#C00000", marker="o", linewidth=2, label="Garis Kumulatif")
+    ax2.axhline(y=80, color='red', linestyle='--', linewidth=1.2, label='Batas Ambang Pareto 80%')
+    ax1.set_title(f"Kurva Distribusi Pareto 80/20 Konsentrasi Kredit Customer ({latest_month})", fontsize=12, fontweight='bold', pad=10, color="#1F497D")
+    
+    ax1.set_xticks(range(len(df_chart_pareto)))
+    ax1.set_xticklabels(df_chart_pareto["Short_Name"], rotation=45, ha="right", fontsize=9)
+    
+    ax1.get_yaxis().set_major_formatter(FuncFormatter(lambda x, p: f"{x:,.0f}"))
+    ax2.get_yaxis().set_major_formatter(FuncFormatter(lambda x, p: f"{x:.0f}%"))
+    ax1.set_xlabel("Nama Pelanggan (Top 20 Outlets)", fontweight='bold')
+    ax1.set_ylabel("Nilai Outstanding Piutang (IDR)", fontweight='bold')
+    ax2.set_ylabel("Akumulasi Proporsi Risiko (%)", fontweight='bold')
+    
+    h1, l1 = ax1.get_legend_handles_labels()
+    h2, l2 = ax2.get_legend_handles_labels()
+    ax2.legend(h1+h2, l1+l2, loc="lower right")
+    plt.tight_layout()
+    chart4_path = "temp_chart_pareto.png"
+    plt.savefig(chart4_path, dpi=120)
+    plt.close()
+    
+    ws4.add_image(OpenpyxlImage(chart4_path), f"B{ws4.max_row + 3}")
+
 print("--> Menyusun Sheet 5: Uji Duplikasi Nomor Faktur...")
 ws5 = wb_new.create_sheet(title="5. Uji Duplikasi Faktur")
 ws5.append(["5. LAPORAN AUDIT DETEKSI DUPLIKASI NOMOR FAKTUR (DUPLICATE INVOICE TEST)"])
@@ -368,14 +460,24 @@ print("--> Menyelaraskan ukuran lebar kolom seluruh berkas audit otomatis...")
 for sheet_name in wb_new.sheetnames:
     ws_to_fit = wb_new[sheet_name]
     for col in ws_to_fit.columns:
-        max_len = 0
-        for cell in col:
-            val_str = str(cell.value or '')
-            if len(val_str) > max_len:
-                max_len = len(val_str)
         col_letter = get_column_letter(col[0].column)
-        ws_to_fit.column_dimensions[col_letter].width = max(max_len + 3, 12)
-
+        
+        if col_letter == 'A':
+            ws_to_fit.column_dimensions[col_letter].width = 35
+        else:
+            max_len = 0
+            for cell in col:
+                val_str = str(cell.value or '')
+                if len(val_str) > max_len:
+                    max_len = len(val_str)
+            ws_to_fit.column_dimensions[col_letter].width = max(max_len + 3, 12)
+            
 final_output = "Laporan_Analisis_Prosedur_Audit.xlsx"
 wb_new.save(final_output)
-print(f"--> SUKSES! Berkas laporan analitis audit '{final_output}' telah diterbitkan.")
+
+print("--> Memulai pembersihan file sementara...")
+for tmp_img in [chart1_path, chart2_path, chart3_path, chart4_path]:
+    if os.path.exists(tmp_img):
+        os.remove(tmp_img)
+
+print(f"--> SUKSES! Berkas laporan analitis audit dengan grafik otomatis '{final_output}' telah diterbitkan.")

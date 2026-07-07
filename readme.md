@@ -1,8 +1,8 @@
 # 🔬 Laporan Analisis Prosedur Audit Piutang
 
-> **Empat metode audit analitik dalam satu laporan Excel — dari data AR Accurate ke temuan risiko siap presentasi**
+> **11 prosedur audit analitik dalam satu laporan Excel — dari statistik klasik hingga Machine Learning, lengkap dengan visualisasi grafik otomatis**
 
-Skrip Python satu file yang membaca data AR bulanan dari file `PTM*.xlsx` (file yang sama digunakan bersama `Monitoring AR Outstanding`), lalu secara otomatis menyusun **`Laporan_Analisis_Prosedur_Audit.xlsx`** berisi lima sheet prosedur audit: analisis tren horizontal & vertikal, deteksi anomali Z-Score, uji Hukum Benford forensik, pemetaan konsentrasi risiko Pareto, hingga deteksi duplikasi faktur.
+Pipeline Python dua tahap yang membaca data AR bulanan dari `PTM*.xlsx`, lalu menghasilkan **`Laporan_Analisis_Prosedur_Audit.xlsx`** berisi 11 sheet prosedur audit: lima analisis audit klasik bergrafik (Horizontal & Vertikal, Z-Score, Benford, Pareto 80/20, Duplikasi Faktur), dilanjutkan enam deteksi anomali berbasis **Machine Learning** (DBSCAN, Isolation Forest, LOF, One-Class SVM, K-Means, Neural Network Autoencoder) — masing-masing disertai tabel temuan dan scatter plot otomatis.
 
 ---
 
@@ -13,15 +13,21 @@ Skrip Python satu file yang membaca data AR bulanan dari file `PTM*.xlsx` (file 
 - [Prasyarat](#-prasyarat)
 - [Struktur Folder & File](#-struktur-folder--file)
 - [Cara Penggunaan](#-cara-penggunaan)
-- [Alur Kerja Detail](#-alur-kerja-detail)
-- [Penjelasan 5 Sheet Audit](#-penjelasan-5-sheet-audit)
+- [Alur Kerja Pipeline](#-alur-kerja-pipeline)
+- [Sheet 1–5: Prosedur Audit Klasik](#-sheet-15-prosedur-audit-klasik)
   - [Sheet 1 — Analisis Horisontal & Vertikal](#sheet-1--analisis-horisontal--vertikal)
   - [Sheet 2 — Anomali Z-Score Makro](#sheet-2--anomali-z-score-makro)
   - [Sheet 3 — Forensik Hukum Benford](#sheet-3--forensik-hukum-benford)
   - [Sheet 4 — Risiko Pareto Customer](#sheet-4--risiko-pareto-customer)
   - [Sheet 5 — Uji Duplikasi Faktur](#sheet-5--uji-duplikasi-faktur)
+- [Sheet 6–11: Deteksi Anomali Machine Learning](#-sheet-611-deteksi-anomali-machine-learning)
+  - [Sheet 6 — DBSCAN](#sheet-6--dbscan-density-based-spatial-clustering)
+  - [Sheet 7 — Isolation Forest](#sheet-7--isolation-forest)
+  - [Sheet 8 — Local Outlier Factor](#sheet-8--local-outlier-factor-lof)
+  - [Sheet 9 — One-Class SVM](#sheet-9--one-class-svm)
+  - [Sheet 10 — K-Means Clustering](#sheet-10--k-means-centroid-distance)
+  - [Sheet 11 — Neural Network Autoencoder](#sheet-11--neural-network-autoencoder)
 - [Konfigurasi `config.conf`](#-konfigurasi-configconf)
-- [Catatan Teknis & Perbedaan dari Monitoring AR](#-catatan-teknis--perbedaan-dari-monitoring-ar)
 - [Troubleshooting](#-troubleshooting)
 - [Catatan Penting](#-catatan-penting)
 
@@ -29,30 +35,28 @@ Skrip Python satu file yang membaca data AR bulanan dari file `PTM*.xlsx` (file 
 
 ## 🗂️ Gambaran Umum & Konteks
 
-Skrip ini dirancang sebagai **lapisan analitik lanjutan** di atas data yang sama dengan proyek `Monitoring AR Outstanding`. Jika `Monitoring AR` berfokus pada *monitoring operasional* (berapa saldo piutang per bulan, berapa yang 60 hari, dst.), maka skrip ini berfokus pada *audit analitik*: menemukan anomali, pola tidak wajar, dan konsentrasi risiko yang perlu direviu lebih mendalam oleh auditor.
+Proyek ini terdiri dari dua lapisan prosedur audit yang berjalan secara berurutan:
 
-Empat metode yang diimplementasikan adalah bagian dari prosedur analitik standar audit keuangan:
+| Tahap | Skrip | Isi | Metode |
+|---|---|---|---|
+| **Tahap 1** | `Analisis_Audit_1.py` | Sheet 1–5 | Statistik klasik + grafik tren/distribusi |
+| **Tahap 2** | `Analisis_Audit_2.py` | Sheet 6–11 | Machine Learning unsupervised anomaly detection |
 
-| Metode | Tujuan Audit |
-|---|---|
-| Analisis Horizontal & Vertikal | Menilai tren dan komposisi portofolio piutang |
-| Z-Score | Mendeteksi lonjakan saldo bulanan yang tidak wajar secara statistik |
-| Hukum Benford | Menguji distribusi digit angka faktur untuk indikasi fraud/manipulasi |
-| Pareto 80/20 | Memetakan konsentrasi risiko gagal bayar pada segelintir pelanggan |
-| Uji Duplikasi | Mendeteksi faktur yang diinput ganda dalam satu bulan |
+Keduanya dijalankan otomatis oleh `Buat Analisis Audit.py` sebagai orkestrator. Tahap 2 membuka hasil Tahap 1 dan **menambahkan** sheet baru ke dalamnya, sehingga laporan akhir berisi 11 sheet dalam satu file.
 
 ---
 
 ## ✨ Fitur Utama
 
-- **Input berbagi dengan Monitoring AR** — Membaca file `PTM*.xlsx` yang sama, dengan logika `clean_key()` dan `auto-detect header` yang identik, sehingga tidak perlu menyiapkan file terpisah.
-- **Kalkulasi MoM otomatis** — Perubahan Month-over-Month dihitung dengan `pct_change()` pandas, tanpa formula manual.
-- **Deteksi anomali statistik Z-Score** — Threshold `|Z-Score| > 1.2` digunakan untuk menandai bulan dengan fluktuasi saldo tidak wajar; baris anomali di-highlight merah secara otomatis.
-- **Analisis forensik Hukum Benford** — Distribusi digit pertama seluruh `Nilai Faktur` dibandingkan dengan probabilitas Benford teoritis; deviasi > 5% ditandai untuk reviu.
-- **Pareto 80/20 berbasis data bulan terakhir** — Mengurutkan pelanggan berdasarkan total saldo piutang, menghitung kumulatif kontribusi, dan mengklasifikasikan mereka yang masuk dalam 80% pertama sebagai `TOP 80% CORE RISK (Kritis)`.
-- **Deteksi duplikasi lintas semua bulan** — Menggabungkan seluruh transaksi dari semua sheet MMYY, lalu menguji apakah ada nomor faktur yang muncul lebih dari sekali dalam bulan yang sama.
-- **Styling audit profesional** — Header biru gelap (`#366092`), baris temuan merah-oranye (`#F2DCDB`), font bold untuk anomali, format angka `#,##0` dan `0.00%`, serta auto-fit lebar kolom di semua sheet.
-- **Auto-generate `config.conf`** — Jika file konfigurasi tidak ditemukan, skrip membuat versi default secara otomatis tanpa menghentikan proses.
+- **Pipeline dua tahap terpisah** — Analisis klasik (Sheet 1–5) dan ML (Sheet 6–11) dijalankan sebagai modul terpisah oleh orkestrator, memudahkan debugging dan pengembangan mandiri.
+- **4 grafik audit otomatis (Tahap 1)** — Setiap sheet utama menghasilkan chart matplotlib/seaborn yang langsung disisipkan ke Excel: dual-axis tren AR, peta Z-Score dengan garis threshold, perbandingan Benford, dan kurva Pareto.
+- **6 metode ML anomaly detection (Tahap 2)** — Menggunakan fitur `Nilai Faktur`, `Sisa Piutang`, dan `Umur Piutang (Hari)` sebagai input tiga dimensi untuk mendeteksi transaksi pencilan dari berbagai sudut pandang algoritmik.
+- **Scatter plot per metode ML** — Setiap sheet ML menyertakan scatter plot `Nilai Faktur vs Sisa Piutang` dengan warna berbeda untuk titik WAJAR (biru) dan ANOMALI (merah), langsung tertanam di Excel.
+- **Pemrosesan data besar (chunking)** — DBSCAN dan LOF mendukung pemrosesan data hingga lebih dari 20.000 baris dengan mekanisme chunking otomatis.
+- **Sampling cerdas One-Class SVM** — Jika data melebihi 10.000 baris, SVM dilatih pada 10.000 sampel acak untuk efisiensi, lalu digunakan untuk memprediksi seluruh dataset.
+- **StandardScaler normalisasi** — Semua fitur dinormalisasi sebelum diumpankan ke model ML agar skala IDR tidak mendominasi jarak Euclidean.
+- **Auto-cleanup gambar sementara** — File PNG chart yang dihasilkan matplotlib dihapus otomatis setelah disisipkan ke Excel.
+- **Validasi kelengkapan file di awal** — Orkestrator memeriksa keberadaan semua file dan folder yang dibutuhkan sebelum memulai, dan menampilkan daftar file yang hilang jika ada.
 
 ---
 
@@ -64,35 +68,44 @@ Python **3.8+** disarankan.
 ### Library yang dibutuhkan
 
 ```bash
-pip install pandas openpyxl numpy
+pip install pandas openpyxl numpy matplotlib seaborn scikit-learn
 ```
 
-| Library | Kegunaan |
-|---|---|
-| `pandas` | Baca Excel, transformasi data, groupby, pct_change |
-| `openpyxl` | Buat workbook, styling sel (font, fill, border, alignment) |
-| `numpy` | Z-Score (mean, std), `np.where` untuk klasifikasi kondisional |
-| `configparser` | Baca `config.conf` (standard library) |
-| `re`, `glob`, `datetime`, `os` | Utilitas (standard library) |
+| Library | Digunakan di | Kegunaan |
+|---|---|---|
+| `pandas` | Keduanya | Baca Excel, transformasi, groupby |
+| `openpyxl` | Keduanya | Buat/edit workbook, styling, sisipkan gambar |
+| `numpy` | Keduanya | Z-Score, `np.where`, operasi array |
+| `matplotlib` | Keduanya | Render grafik ke file PNG |
+| `seaborn` | Keduanya | Styling chart (barplot, lineplot, scatterplot) |
+| `scikit-learn` | Analisis_Audit_2.py | DBSCAN, Isolation Forest, LOF, One-Class SVM, K-Means, MLPRegressor, StandardScaler |
+| `configparser`, `re`, `glob`, `datetime`, `os`, `shutil`, `subprocess` | Keduanya | Utilitas (standard library) |
+
+> **Catatan scikit-learn:** Pastikan versi scikit-learn ≥ 1.0. Gunakan `pip install scikit-learn --upgrade` jika diperlukan.
 
 ---
 
 ## 📁 Struktur Folder & File
 
 ```
-📦 Buat_Analisis_Audit/
+📦 Analisis-Audit/
 │
-├── 📄 Buat_Analisis_Audit.py                ← Skrip utama. Jalankan ini
-├── 📄 config.conf                           ← Konfigurasi filter produk
-│                                               (dibuat otomatis jika tidak ada)
+├── 📄 Buat Analisis Audit.py              ← Orkestrator utama. Jalankan ini
 │
-├── 📄 PTM*.xlsx                             ← [INPUT] File data AR bulanan
-│                                               (nama bebas asal diawali "PTM")
+├── 📄 PTM*.xlsx                           ← [INPUT] File data AR bulanan dari Accurate
+│                                             (nama bebas asal diawali "PTM")
 │
-└── 📄 Laporan_Analisis_Prosedur_Audit.xlsx  ← [OUTPUT] Dihasilkan otomatis
+├── 📁 Dapur/                              ← Folder pipeline (jangan diubah strukturnya)
+│   ├── 📄 __init__.py
+│   ├── 📄 Analisis_Audit_1.py            ← Tahap 1: Sheet 1–5 audit klasik + grafik
+│   ├── 📄 Analisis_Audit_2.py            ← Tahap 2: Sheet 6–11 deteksi anomali ML
+│   └── 📄 config.conf                    ← Konfigurasi filter produk
+│
+├── 📁 Contoh Data/                        ← Folder data sampel untuk uji coba
+│   └── 📄 PTM - Laporan AR Bulanan Jawa.xlsx
+│
+└── 📄 Laporan_Analisis_Prosedur_Audit.xlsx ← [OUTPUT] Dihasilkan otomatis
 ```
-
-> Semua file berada dalam **satu folder**. Tidak ada subfolder.
 
 ---
 
@@ -100,171 +113,195 @@ pip install pandas openpyxl numpy
 
 ### Langkah 1 — Siapkan file input PTM
 
-Letakkan file `PTM*.xlsx` di folder yang sama dengan `Buat_Analisis_Audit.py`. File ini adalah ekspor AR bulanan dari Accurate dengan sheet berformat `MMYY` (mis. `0125` untuk Januari 2025).
+Letakkan file ekspor AR dari Accurate di **folder utama** (sejajar dengan `Buat Analisis Audit.py`) dengan nama yang diawali `PTM`:
 
-> Jika sudah memiliki file `PTM*.xlsx` dari proyek `Monitoring AR Outstanding`, **file yang sama** dapat langsung digunakan tanpa perubahan apapun.
+```
+PTM_Jawa_2025.xlsx      ← contoh nama valid
+PTM.xlsx                ← contoh nama valid
+PTM AR Bulanan.xlsx     ← contoh nama valid
+```
 
-Syarat struktur file PTM: setiap sheet `MMYY` harus memiliki kolom-kolom berikut:
+File PTM wajib memiliki sheet dengan nama format `MMYY` (mis. `0125` untuk Jan-2025), berisi kolom berikut:
 
 | Kolom wajib | Kolom opsional |
 |---|---|
 | `Sisa Piutang` | `Negara Pelanggan` |
-| `Umur AR base on Tgl Faktur` | `Kontak Pelanggan` |
-| `Nama Penjual` | `Nilai Faktur` |
+| `Umur AR base on Tgl Faktur` | `Nilai Faktur` |
+| `Nama Penjual` | |
 | `Nama Pelanggan` | |
 | `No. Faktur` | |
 
-### Langkah 2 — (Opsional) Sesuaikan `config.conf`
+> **Uji coba pertama?** Salin file `Contoh Data/PTM - Laporan AR Bulanan Jawa.xlsx` ke folder utama dan ganti namanya menjadi `PTM - Laporan AR Bulanan Jawa.xlsx` atau nama apapun yang diawali `PTM`.
 
-`config.conf` dibaca skrip ini untuk membangun `filter_produk`, namun pada versi saat ini konfigurasi tersebut **tidak digunakan aktif** dalam kalkulasi output. File tetap dibaca dan dibuat otomatis agar kompatibel dengan skrip lain dalam ekosistem yang sama.
-
-### Langkah 3 — Jalankan
+### Langkah 2 — Jalankan
 
 ```bash
-python Buat_Analisis_Audit.py
+python "Buat Analisis Audit.py"
 ```
 
-Program akan menampilkan progress per sheet di terminal:
+atau klik dua kali file tersebut jika Python sudah terasosiasi di sistem.
+
+### Langkah 3 — Pantau progress di terminal
 
 ```
---> Memulai pemrosesan data audit analytics ...
+--> Menjalankan Analisis_Audit_1.py...
+--> Memulai pemrosesan data audit analisis ...
 --> Menyusun Sheet 1: Analisis Horisontal & Vertikal...
---> Menyusun Sheet 3: Deteksi Statistik Z-Score...
+--> Menyusun Sheet 2: Deteksi Statistik Z-Score...
 --> Menyusun Sheet 3: Forensik Digit Angka Hukum Benford...
 --> Menyusun Sheet 4: Kosentrasi Risiko Piutang Hukum Pareto...
 --> Menyusun Sheet 5: Uji Duplikasi Nomor Faktur...
---> Menyelaraskan ukuran lebar kolom seluruh berkas audit otomatis...
---> SUKSES! Berkas laporan analitis audit 'Laporan_Analisis_Prosedur_Audit.xlsx' telah diterbitkan.
+--> SUKSES! Berkas laporan analitis audit dengan grafik otomatis '...' telah diterbitkan.
+--> Menjalankan Analisis_Audit_2.py...
+--> Memulai pemrosesan data audit advanced machine learning ...
+--> Menyusun Sheet 6: Deteksi Anomali DBSCAN...
+--> Menyusun Sheet 7: Deteksi Anomali Isolation Forest...
+--> Menyusun Sheet 8: Deteksi Anomali Local Outlier Factor...
+--> Menyusun Sheet 9: Deteksi Anomali One-Class SVM...
+--> Menyusun Sheet 10: Deteksi Anomali K-Means Distance...
+--> Menyusun Sheet 11: Deteksi Anomali Neural Network Autoencoder...
+--> SUKSES! Berkas laporan analitis audit '...' telah diperbarui dengan prosedur Machine Learning.
+--> File Laporan_Analisis_Prosedur_Audit.xlsx berhasil dibuat dan disalin.
+--> Semua proses selesai dan folder Dapur telah dibersihkan dari file sampah.
 ```
+
+> ⏱️ **Estimasi waktu:** Tahap 1 selesai dalam hitungan detik. Tahap 2 bergantung pada jumlah baris data — untuk data ribuan baris bisa memakan 1–5 menit karena proses training model ML.
 
 ### Langkah 4 — Buka laporan
 
-Buka **`Laporan_Analisis_Prosedur_Audit.xlsx`** yang muncul di folder yang sama.
+Buka **`Laporan_Analisis_Prosedur_Audit.xlsx`** di folder utama.
 
 ---
 
-## 🔄 Alur Kerja Detail
+## 🔄 Alur Kerja Pipeline
 
 ```
-[Mulai]
+[Mulai: Buat Analisis Audit.py]
    │
-   ├─── Inisialisasi
-   │       Baca config.conf → ambil filter_produk
-   │       Buat config.conf default jika tidak ada
-   │       Cari PTM*.xlsx dengan glob → ambil yang pertama ditemukan
-   │       Filter sheet MMYY valid → urutkan kronologis
+   ├─── Validasi kelengkapan file
+   │       Cek folder Dapur/ ada
+   │       Cek Analisis_Audit_1.py, Analisis_Audit_2.py, config.conf, __init__.py
+   │       Cek PTM*.xlsx ada di folder utama
+   │       Jika ada yang hilang → tampilkan daftar → berhenti
    │
-   ├─── Bangun dua dataset master (loop semua sheet MMYY)
-   │       │
-   │       ├─ df_macro_master  (satu baris per bulan, 7 metrik agregat)
-   │       │     Sama dengan kalkulasi Monitoring AR:
-   │       │     Total AR, AR 60 Hari Up, Bad Debt, jumlah customer distinct
-   │       │     (dengan ekslusi FRAUD & filter days)
-   │       │
-   │       └─ df_micro_master  (semua baris transaksi, lintas semua bulan)
-   │             + kolom tambahan: Bulan_Sistem, Cleaned_Sisa_Piutang,
-   │               Cleaned_Nilai_Faktur, Cleaned_Days, Cleaned_Cust_ID
+   ├─── Bersihkan sisa run sebelumnya
+   │       Hapus semua *.xls dan *.xlsx dari folder Dapur/
    │
-   ├─── [Sheet 1] Analisis Horisontal & Vertikal
-   │       Hitung MoM % change → Rasio AR 60 / Total → Rasio Bad Debt / Total
-   │       Tulis tabel 7 kolom dengan format angka + persen
+   ├─── Pindahkan PTM*.xlsx → Dapur/
    │
-   ├─── [Sheet 2] Anomali Z-Score
-   │       Hitung mean & std Total AR seluruh periode
-   │       Z-Score per bulan = (nilai - mean) / std
-   │       Threshold |Z| > 1.2 → "ANOMALI / REVIU MENDALAM" + highlight merah
+   ├─── Pindah ke direktori Dapur/ → jalankan Analisis_Audit_1.py
+   │       [TAHAP 1 — lihat detail di bawah]
+   │       Output: Dapur/Laporan_Analisis_Prosedur_Audit.xlsx (Sheet 1–5)
+   │       Jika gagal → berhenti + tampilkan pesan error
    │
-   ├─── [Sheet 3] Forensik Hukum Benford
-   │       Ekstrak digit pertama non-nol dari semua Cleaned_Nilai_Faktur
-   │       Hitung frekuensi aktual (proporsi) per digit 1–9
-   │       Bandingkan dengan distribusi Benford teoritis
-   │       Threshold |deviasi| > 5% → "REVIU (Deviasi Tinggi)" + highlight merah
+   ├─── Jalankan Analisis_Audit_2.py (masih di Dapur/)
+   │       [TAHAP 2 — lihat detail di bawah]
+   │       Output: Dapur/Laporan_Analisis_Prosedur_Audit.xlsx (Sheet 1–11)
+   │       Jika gagal → berhenti + tampilkan pesan error
    │
-   ├─── [Sheet 4] Pareto 80/20
-   │       Filter hanya data bulan terakhir (latest_month)
-   │       Groupby Cleaned_Cust_ID → sum Sisa Piutang → urutkan menurun
-   │       Hitung Kontribusi% dan Kumulatif%
-   │       Kumulatif ≤ 80% → "TOP 80% CORE RISK (Kritis)" + highlight merah
-   │       Tampilkan top 25 pelanggan
-   │
-   ├─── [Sheet 5] Uji Duplikasi Faktur
-   │       Normalisasi kolom df_micro_master dengan clean_key()
-   │       Groupby (Bulan_Sistem + No. Faktur) → count
-   │       Filter count > 1 → merge kembali ke detail transaksi
-   │       Tampilkan semua baris duplikat dengan rekomendasi tindakan
-   │
-   ├─── Auto-fit lebar kolom semua sheet
-   │
-   └─── Simpan sebagai Laporan_Analisis_Prosedur_Audit.xlsx ✅
+   ├─── Kembali ke direktori utama
+   ├─── Salin laporan dari Dapur/ → folder utama
+   └─── Bersihkan Dapur/ dari semua file Excel
+```
+
+### Detail Tahap 1 (`Analisis_Audit_1.py`)
+
+```
+Baca & validasi file PTM → loop semua sheet MMYY
+  ├─ Bangun df_macro_master (7 metrik per bulan)
+  └─ Bangun df_micro_master (semua transaksi lintas bulan)
+
+[Sheet 1] Horizontal & Vertikal
+  └─ Tabel MoM + Rasio → Dual-axis chart (bar AR + line rasio)
+
+[Sheet 2] Z-Score
+  └─ Tabel Z-Score per bulan → Bar chart dengan garis threshold ±1.2
+
+[Sheet 3] Benford
+  └─ Tabel 9 digit vs distribusi Benford → Grouped bar chart
+
+[Sheet 4] Pareto 80/20
+  └─ Tabel top 25 pelanggan → Pareto curve chart (bar + garis kumulatif)
+
+[Sheet 5] Duplikasi Faktur
+  └─ Tabel duplikat intra-bulan (tanpa chart)
+
+Hapus file PNG chart sementara → Simpan Laporan_Analisis_Prosedur_Audit.xlsx
+```
+
+### Detail Tahap 2 (`Analisis_Audit_2.py`)
+
+```
+Buka Laporan_Analisis_Prosedur_Audit.xlsx yang sudah ada (dari Tahap 1)
+Baca ulang PTM → bangun df_micro_master
+Normalisasi 3 fitur: [Nilai Faktur, Sisa Piutang, Umur Hari] via StandardScaler
+
+Untuk setiap metode ML:
+  ├─ Latih model → prediksi label (ANOMALI / WAJAR) per baris transaksi
+  ├─ Buat tabel detail baris yang terdeteksi ANOMALI
+  ├─ Buat scatter plot (Nilai Faktur vs Sisa Piutang, warna per label)
+  └─ Sisipkan tabel + scatter plot ke sheet baru
+
+[Sheet 6]  DBSCAN (cluster = -1 → ANOMALI)
+[Sheet 7]  Isolation Forest (contamination = 2%)
+[Sheet 8]  Local Outlier Factor (k=20, contamination = 2%)
+[Sheet 9]  One-Class SVM (nu=0.02, kernel=rbf)
+[Sheet 10] K-Means Distance (k=4, threshold = persentil 98)
+[Sheet 11] Autoencoder NN (threshold rekonstruksi = persentil 98)
+
+Hapus file PNG sementara → Simpan Laporan_Analisis_Prosedur_Audit.xlsx (11 sheet)
 ```
 
 ---
 
-## 📊 Penjelasan 5 Sheet Audit
+## 📊 Sheet 1–5: Prosedur Audit Klasik
 
 ### Sheet 1 — Analisis Horisontal & Vertikal
 
 **Tujuan audit:** Menilai volatilitas perubahan saldo bulanan dan komposisi risiko portofolio piutang.
 
-**Analisis Horisontal (kolom MoM):**
-Mengukur persentase perubahan Total AR Outstanding dari satu bulan ke bulan berikutnya menggunakan `pct_change()`. Peningkatan MoM yang konsisten tanpa diimbangi pembayaran adalah sinyal risiko penumpukan piutang.
+**Analisis Horisontal:** Persentase perubahan Total AR Outstanding bulan ke bulan (MoM) via `pct_change()`. Kenaikan MoM yang konsisten tanpa pembayaran = sinyal penumpukan.
 
-**Analisis Vertikal (kolom Rasio):**
-Mengukur proporsi AR 60 Hari Up dan Bad Debt terhadap Total AR Outstanding. Rasio yang meningkat dari bulan ke bulan mengindikasikan penurunan kualitas portofolio.
+**Analisis Vertikal:** Proporsi AR 60 Hari Up dan Bad Debt terhadap Total AR. Rasio meningkat = penurunan kualitas portofolio.
 
-**Kolom yang dihasilkan:**
+**Grafik otomatis:** Dual-axis chart — batang biru untuk Total AR Outstanding (sumbu kiri IDR), dua garis untuk Rasio 60+ dan Rasio Bad Debt (sumbu kanan %).
 
-| Kolom | Format | Keterangan |
-|---|---|---|
-| Bulan | Teks | Label bulan (mis. `Jan-25`) |
-| Total AR Outstanding | `#,##0` | Seluruh sisa piutang bulan ini |
-| Perubahan MoM (%) | `0.00%` | Perubahan terhadap bulan sebelumnya. Baris pertama = 0% |
-| AR 60 Hari Up | `#,##0` | Piutang umur 60–364 hari (non-FRAUD) |
-| Rasio Kontribusi 60+ (%) | `0.00%` | AR 60 Hari Up ÷ Total AR |
-| AR Bad Debt (365+) | `#,##0` | Piutang umur ≥ 365 hari (non-FRAUD) |
-| Rasio Kontribusi Bad Debt (%) | `0.00%` | Bad Debt ÷ Total AR |
+| Kolom | Format |
+|---|---|
+| Bulan | Teks |
+| Total AR Outstanding | `#,##0` |
+| Perubahan MoM (%) | `0.00%` |
+| AR 60 Hari Up | `#,##0` |
+| Rasio Kontribusi 60+ (%) | `0.00%` |
+| AR Bad Debt (365+) | `#,##0` |
+| Rasio Kontribusi Bad Debt (%) | `0.00%` |
 
 ---
 
 ### Sheet 2 — Anomali Z-Score Makro
 
-**Tujuan audit:** Menemukan bulan dengan lonjakan atau penurunan saldo ekstrim yang berada di luar batas fluktuasi normal secara statistik.
-
-**Cara kerja Z-Score:**
+**Tujuan audit:** Menemukan bulan dengan lonjakan saldo ekstrim di luar batas fluktuasi normal secara statistik.
 
 ```
-Z-Score (bulan X) = (Total AR bulan X - Rata-rata semua bulan) / Std Dev semua bulan
+Z-Score (bulan X) = (Total AR bulan X − Rata-rata semua bulan) / Std Dev semua bulan
 ```
 
-Nilai Z-Score mengukur seberapa jauh saldo bulan tersebut menyimpang dari rata-rata historis, dalam satuan standar deviasi.
-
-| Rentang Z-Score | Interpretasi |
+| Rentang Z-Score | Status |
 |---|---|
-| `-1.2` s.d. `+1.2` | **WAJAR** — fluktuasi dalam batas normal |
-| `< -1.2` atau `> +1.2` | **ANOMALI / REVIU MENDALAM** — perlu investigasi penyebab |
+| `−1.2` s.d. `+1.2` | **WAJAR** |
+| `< −1.2` atau `> +1.2` | **ANOMALI / REVIU MENDALAM** — highlight merah, bold |
 
-Baris dengan status `ANOMALI` diberi **highlight merah-oranye** dan **teks tebal** secara otomatis.
-
-**Kolom yang dihasilkan:**
-
-| Kolom | Format | Keterangan |
-|---|---|---|
-| Bulan | Teks | Label bulan |
-| Total AR Outstanding | `#,##0` | Saldo bulan tersebut |
-| Deviasi Nilai dari Rata-Rata (Z-Score) | `0.00` | Nilai Z-Score |
-| Status Kesimpulan Audit | Teks | `WAJAR` atau `ANOMALI / REVIU MENDALAM` |
+**Grafik otomatis:** Bar chart Z-Score per bulan dengan dua garis horizontal putus-putus merah di ±1.2 sebagai batas toleransi.
 
 ---
 
 ### Sheet 3 — Forensik Hukum Benford
 
-**Tujuan audit:** Mendeteksi indikasi manipulasi data atau faktur fiktif melalui pengujian distribusi digit pertama seluruh nilai faktur.
+**Tujuan audit:** Mendeteksi indikasi manipulasi atau faktur fiktif via distribusi digit pertama seluruh nilai faktur.
 
-**Dasar teori:** Hukum Benford menyatakan bahwa dalam kumpulan data keuangan organik yang besar, digit pertama angka (1–9) mengikuti distribusi logaritmik yang dapat diprediksi. Data yang telah dimanipulasi cenderung menyimpang dari distribusi ini karena pola buatan manusia tidak mengikuti alam data alami.
+**Distribusi Benford teoritis:**
 
-**Distribusi Benford teoritis yang digunakan:**
-
-| Digit | Ekspektasi Benford |
+| Digit | Ekspektasi |
 |---|---|
 | 1 | 30,1% |
 | 2 | 17,6% |
@@ -276,84 +313,146 @@ Baris dengan status `ANOMALI` diberi **highlight merah-oranye** dan **teks tebal
 | 8 | 5,1% |
 | 9 | 4,6% |
 
-**Logika ekstraksi digit pertama:**
-Dari kolom `Cleaned_Nilai_Faktur`, semua karakter non-digit dihapus, lalu karakter pertama yang bukan `0` diambil sebagai digit pertama. Baris dengan nilai `0` atau yang tidak bisa diekstrak diabaikan dari analisis.
+**Threshold:** `|Deviasi| > 5%` → `"REVIU (Deviasi Tinggi)"` + highlight merah.
 
-**Threshold:** `|Proporsi Riil - Ekspektasi Benford| > 5%` → `"REVIU (Deviasi Tinggi)"` + highlight merah.
-
-**Kolom yang dihasilkan:**
-
-| Kolom | Format | Keterangan |
-|---|---|---|
-| Komponen Digit Pertama | Teks | `Digit 1` s.d. `Digit 9` |
-| Proporsi Riil Faktur (%) | `0.00%` | Frekuensi aktual dari data |
-| Ekspektasi Hukum Benford (%) | `0.00%` | Nilai teoritis Benford |
-| Nilai Deviasi Selisih | `0.00%` | Selisih (Riil - Ekspektasi). Negatif = lebih sedikit dari ekspektasi |
-| Status Evaluasi Data | Teks | `NORMAL` atau `REVIU (Deviasi Tinggi)` |
+**Grafik otomatis:** Grouped bar chart membandingkan proporsi riil (oranye) vs ekspektasi Benford (biru) per digit 1–9.
 
 ---
 
 ### Sheet 4 — Risiko Pareto Customer
 
-**Tujuan audit:** Mengidentifikasi pelanggan-pelanggan inti yang secara kolektif menguasai 80% saldo piutang, untuk menilai risiko konsentrasi dan gagal bayar massal.
+**Tujuan audit:** Mengidentifikasi pelanggan yang secara kolektif menguasai 80% saldo piutang (konsentrasi risiko gagal bayar).
 
-**Prinsip Pareto 80/20:** Dalam banyak portofolio piutang, sebagian kecil pelanggan menyumbang sebagian besar saldo. Pelanggan yang masuk dalam 80% kumulatif pertama adalah titik risiko paling kritis yang harus diprioritaskan dalam penagihan dan pemantauan.
+**Sumber data:** Hanya bulan terakhir yang tersedia di PTM. Menampilkan **top 25 pelanggan** berdasarkan saldo.
 
-**Sumber data:** Hanya menggunakan data bulan **terakhir** yang tersedia di file PTM (bulan paling baru secara kronologis), agar mencerminkan kondisi risiko terkini.
+**Logika klasifikasi:**
+- Urutkan pelanggan dari saldo terbesar
+- Hitung `Kumulatif%` secara kumulatif
+- `Kumulatif% ≤ 80%` → `TOP 80% CORE RISK (Kritis)` (highlight merah, bold)
 
-**Urutan proses:**
-1. Groupby `Cleaned_Cust_ID` → sum `Cleaned_Sisa_Piutang`
-2. Urutkan dari saldo terbesar ke terkecil
-3. Hitung `Kontribusi%` = saldo pelanggan ÷ total AR bulan tersebut
-4. Hitung `Kumulatif%` = akumulasi kumulatif Kontribusi%
-5. Tandai pelanggan dengan `Kumulatif% ≤ 80%` sebagai `TOP 80% CORE RISK (Kritis)`
-
-> Sheet hanya menampilkan **25 pelanggan teratas** (top 25 by saldo).
-
-**Kolom yang dihasilkan:**
-
-| Kolom | Format | Keterangan |
-|---|---|---|
-| ID/Nama Pelanggan | Teks | Cleaned_Cust_ID (kode atau nama) |
-| Total Saldo Piutang (Bulan) | `#,##0` | Total sisa piutang pelanggan ini |
-| Proporsi Beban Risiko (%) | `0.00%` | Kontribusi pelanggan terhadap total AR |
-| Akumulasi Distribusi Kumulatif (%) | `0.00%` | Kumulatif dari pelanggan 1 s.d. baris ini |
-| Grup Prioritas Pengawasan | Teks | `TOP 80% CORE RISK (Kritis)` atau `Regular` |
-
-Baris dengan klasifikasi `Kritis` diberi **highlight merah-oranye** dan **teks tebal**.
+**Grafik otomatis:** Kurva Pareto — batang biru per pelanggan (saldo, sumbu kiri) + garis merah kumulatif (sumbu kanan %) dengan garis putus-putus di 80%.
 
 ---
 
 ### Sheet 5 — Uji Duplikasi Faktur
 
-**Tujuan audit:** Mendeteksi nomor faktur yang diinput lebih dari sekali dalam bulan yang sama — indikasi `double input` atau `double journal` yang akan menggelembungkan saldo piutang.
+**Tujuan audit:** Mendeteksi nomor faktur yang diinput lebih dari sekali dalam bulan yang sama (double input / double journal).
 
-**Logika deteksi:**
-1. Gabungkan seluruh transaksi dari semua bulan (`df_micro_master`)
-2. Normalisasi nama kolom dengan `clean_key()`
-3. Groupby `(Bulan_Sistem + No. Faktur)` → hitung jumlah kemunculan
-4. Filter hanya yang count > 1 (duplikat intra-bulan)
-5. Merge kembali ke baris detail untuk menampilkan informasi lengkap
+Pengujian bersifat **intra-bulan** — faktur yang muncul di dua bulan berbeda (carry-over) tidak dianggap duplikat. Sheet ini tidak memiliki grafik; hanya tabel temuan.
 
-**Catatan:** Pengujian dilakukan secara **intra-bulan** — nomor faktur yang sama muncul di bulan berbeda (mis. faktur belum lunas yang carry-over) tidak dianggap duplikat. Hanya kemunculan ganda dalam satu bulan yang sama yang ditandai.
+| Kolom | Format |
+|---|---|
+| Nomor Faktur | Teks |
+| Jumlah Kemunculan Di Bulan Ini | `#,##0` |
+| ID/Nama Pelanggan | Teks |
+| Bulan Transaksi | Teks |
+| Nilai Faktur | `#,##0` |
+| Sisa Piutang | `#,##0` |
+| Rekomendasi Tindakan | `REVIU JURNAL (Duplikasi Intra-Bulan)` |
 
-**Kolom yang dihasilkan:**
+---
+
+## 🤖 Sheet 6–11: Deteksi Anomali Machine Learning
+
+Keenam sheet ini menggunakan **tiga fitur numerik** yang telah dinormalisasi via `StandardScaler`:
+
+| Fitur | Kolom sumber |
+|---|---|
+| `Cleaned_Nilai_Faktur` | `Nilai Faktur` |
+| `Cleaned_Sisa_Piutang` | `Sisa Piutang` |
+| `Cleaned_Days` | Angka dari `Umur AR base on Tgl Faktur` |
+
+Semua sheet menggunakan format tabel yang sama:
 
 | Kolom | Format | Keterangan |
 |---|---|---|
-| Nomor Faktur | Teks | Nomor faktur yang terdeteksi duplikat |
-| Jumlah Kemunculan Di Bulan Ini | `#,##0` | Berapa kali nomor ini muncul di bulan tersebut |
-| ID/Nama Pelanggan | Teks | Nama pelanggan dari baris data |
-| Bulan Transaksi | Teks | Bulan di mana duplikasi terjadi |
+| Bulan | Teks | Bulan transaksi |
+| Nomor Faktur | Teks | No. faktur |
+| ID/Nama Pelanggan | Teks | Nama atau kode pelanggan |
 | Nilai Faktur | `#,##0` | Nilai faktur asli |
-| Sisa Piutang | `#,##0` | Sisa piutang baris tersebut |
-| Rekomendasi Tindakan | Teks | `REVIU JURNAL (Duplikasi Intra-Bulan)` |
+| Sisa Piutang | `#,##0` | Sisa piutang |
+| Umur Piutang (Hari) | `#,##0` | Nilai `days` |
+| Kesimpulan Audit | Teks | `REVIU INDIKASI ANOMALI` (highlight merah) atau `WAJAR` |
 
-Jika kolom `No. Faktur` tidak ditemukan di data, sheet menampilkan satu baris pesan: `"Kolom Nomor Faktur tidak ditemukan di dalam berkas data sumber."`
+Jika tidak ada anomali terdeteksi, tabel berisi satu baris: `"Tidak ada transaksi pencilan terdeteksi"`.
+
+---
+
+### Sheet 6 — DBSCAN (Density-Based Spatial Clustering)
+
+**Prinsip:** Mengelompokkan titik berdasarkan kepadatan. Transaksi di area berkerapatan rendah yang tidak masuk ke cluster manapun diberi label `−1` = **ANOMALI**.
+
+**Parameter:** `eps=0.5`, `min_samples=4`, `algorithm='ball_tree'`
+
+**Kelebihan:** Tidak perlu menentukan jumlah cluster; menemukan anomali struktural secara natural. Cocok untuk data dengan bentuk cluster non-spherical.
+
+**Chunking:** Untuk data > 20.000 baris, DBSCAN dijalankan per chunk dan hasilnya digabungkan.
+
+---
+
+### Sheet 7 — Isolation Forest
+
+**Prinsip:** Membangun pohon isolasi acak. Transaksi yang cepat terisolasi (kedalaman pohon pendek) dianggap pencilan — karena anomali sedikit dan berbeda, lebih mudah dipisahkan.
+
+**Parameter:** `contamination=0.02` (2% data diasumsikan anomali), `random_state=42`
+
+**Kelebihan:** Efisien untuk dataset besar; tidak bergantung pada asumsi distribusi data.
+
+---
+
+### Sheet 8 — Local Outlier Factor (LOF)
+
+**Prinsip:** Membandingkan densitas lokal suatu transaksi dengan densitas k-tetangga terdekatnya. Transaksi dengan densitas jauh lebih rendah dari tetangganya = **ANOMALI**.
+
+**Parameter:** `n_neighbors=20`, `contamination=0.02`, `algorithm='ball_tree'`
+
+**Kelebihan:** Sensitif terhadap anomali lokal — mampu menemukan pencilan di area yang secara global terlihat padat.
+
+**Chunking:** Sama seperti DBSCAN, didukung chunking untuk dataset besar.
+
+---
+
+### Sheet 9 — One-Class SVM
+
+**Prinsip:** Mempelajari batas keputusan non-linear di ruang berdimensi tinggi (via kernel RBF) yang melingkupi mayoritas data normal. Titik di luar batas = **ANOMALI**.
+
+**Parameter:** `nu=0.02` (batas atas fraksi anomali), `kernel='rbf'`, `gamma='scale'`
+
+**Sampling:** Untuk data > 10.000 baris, model dilatih pada 10.000 sampel acak (`random_state=42`) lalu digunakan untuk memprediksi seluruh data.
+
+**Kelebihan:** Sangat fleksibel untuk pola anomali non-linear dan non-konveks.
+
+---
+
+### Sheet 10 — K-Means Centroid Distance
+
+**Prinsip:** Membagi data ke dalam 4 cluster. Transaksi dengan jarak Euclidean terbesar dari centroid clusternya = pencilan potensial.
+
+**Parameter:** `n_clusters=4`, `n_init=3`, `random_state=42`
+
+**Threshold:** Persentil ke-98 dari distribusi jarak seluruh transaksi. Transaksi di atas threshold = **ANOMALI**.
+
+**Kelebihan:** Sederhana dan interpretatif; threshold berbasis persentil membuat jumlah temuan relatif stabil di ~2% data.
+
+---
+
+### Sheet 11 — Neural Network Autoencoder
+
+**Prinsip:** Melatih jaringan syaraf tiruan untuk me-*rekonstruksi* input (encode → decode). Transaksi yang sulit direkonstruksi (error rekonstruksi tinggi) = pola tidak normal yang tidak dipelajari model.
+
+**Arsitektur:** `MLPRegressor` dengan `hidden_layer_sizes=(2,)` — bottleneck dua neuron memaksa kompresi fitur esensial.
+
+**Parameter:** `activation='relu'`, `max_iter=100`, `early_stopping=True`, `random_state=42`
+
+**Threshold:** Persentil ke-98 dari distribusi reconstruction error. Di atas threshold = **ANOMALI**.
+
+**Kelebihan:** Mampu menangkap interaksi kompleks non-linear antar fitur yang tidak terlihat oleh metode geometris/densitas.
 
 ---
 
 ## ⚙️ Konfigurasi `config.conf`
+
+Terletak di `Dapur/config.conf`:
 
 ```ini
 [FILTER]
@@ -365,72 +464,68 @@ FILTER
 JIMCO
 LAIN
 TOP 1
-OLI
 ```
 
-File dibaca saat startup untuk membangun daftar `filter_produk`. Dalam versi skrip ini, konfigurasi tersebut **tidak menghasilkan tabel kontribusi produk** — berbeda dengan `Buat_Data.py` (Monitoring AR) yang menggunakannya untuk mengelompokkan AR-60 dan Bad Debt per produk.
+Dibaca oleh kedua skrip untuk membangun `filter_produk`. Pada versi ini konfigurasi digunakan untuk validasi, namun **tidak secara aktif menghasilkan tabel kontribusi produk** dalam sheet output.
 
-Jika `config.conf` tidak ada saat skrip dijalankan, file akan dibuat otomatis dengan isi default: `SHELL, IRC, ZN, GT, FILTER, JIMCO, LAIN, TOP 1, OLI`.
-
----
-
-## ⚠️ Catatan Teknis & Perbedaan dari Monitoring AR
-
-Skrip ini dan `Buat_Data.py` (Monitoring AR Outstanding) berbagi input yang sama namun memiliki satu perbedaan kritis pada nama kolom:
-
-| Aspek | `Buat_Analisis_Audit.py` (skrip ini) | `Buat_Data.py` (Monitoring AR) |
-|---|---|---|
-| Sumber input | `PTM*.xlsx` | `PTM*.xlsx` |
-| Output | `Laporan_Analisis_Prosedur_Audit.xlsx` | `Monitoring.xlsx` |
-| Filter produk | Dibaca tapi tidak dipakai aktif | Dipakai untuk tabel kontribusi produk |
-| Basis data Pareto | Hanya bulan terakhir | Semua bulan (rekap per bulan) |
-
-> Jika file PTM hanya memiliki salah satu dari kedua nama kolom tersebut, salah satu skrip akan menghasilkan metrik aging yang kosong/nol. Pastikan nama kolom di file Accurate konsisten.
+Jika `config.conf` tidak ditemukan, kedua skrip akan membuat versi default secara otomatis.
 
 ---
 
 ## 🛠️ Troubleshooting
 
-### ❌ `File PTM*.xlsx tidak ditemukan`
-Pastikan file data Accurate ada di folder yang sama dengan skrip dan namanya diawali `PTM`. Skrip mengambil file pertama yang ditemukan oleh `glob("PTM*.xlsx")`.
+### ❌ `Proses digagalkan. File atau folder berikut tidak ditemukan`
+Periksa daftar file yang ditampilkan. Kemungkinan penyebab: folder `Dapur/` tidak ada, salah satu skrip dihapus, atau file `PTM*.xlsx` belum diletakkan di folder utama.
 
-### ❌ `Tidak ada sheet bulanan (format MMYY) yang valid`
-Skrip mencari sheet dengan nama tepat 4 digit (`0125`, `1224`, dst.). Periksa nama sheet di file PTM — tidak boleh ada spasi, huruf, atau karakter tambahan.
+### ❌ `File PTM*.xlsx tidak ditemukan` (dari dalam Dapur/)
+File PTM berhasil dipindahkan ke `Dapur/` oleh orkestrator, tapi salah satu skrip tidak menemukannya. Pastikan nama file dimulai dengan `PTM` dan berekstensi `.xlsx` (bukan `.xls`).
 
-### ❌ Seluruh kolom AR 60, Bad Debt, dan customer count bernilai 0
-Kemungkinan besar kolom `"Umur AR base on Tgl Faktur"` tidak ditemukan di file PTM. Cek nama kolom umur di file Accurate dan bandingkan dengan nilai `umur_japo_col` di baris:
-```python
-umur_japo_col = clean_key("Umur AR base on Tgl Faktur")
+### ❌ Sheet 6–11 kosong semua / semua bertuliskan `Tidak ada transaksi pencilan terdeteksi`
+Terjadi jika data terlalu sedikit (< 10 baris). Model ML membutuhkan minimum data untuk membangun distribusi normal. Periksa jumlah baris aktual di sheet MMYY file PTM.
+
+### ❌ Error `ModuleNotFoundError: No module named 'sklearn'`
+Install scikit-learn:
+```bash
+pip install scikit-learn
 ```
-Fungsi `clean_key()` menghapus semua karakter non-alphanumeric dan mengubah ke lowercase, jadi `"Umur AR base on Tgl Faktur"` menjadi `"umarbaseontglfaktur"`. Pastikan nama kolom di file mengandung kata-kata yang sama setelah normalisasi.
 
-### ❌ Sheet 3 (Benford) menampilkan semua `DATA TIDAK CUKUP`
-Terjadi jika kolom `Nilai Faktur` tidak ditemukan atau semua nilainya kosong/nol, sehingga tidak ada digit pertama yang bisa diekstrak. Cek keberadaan kolom `nilai_faktur_col` di file PTM.
+### ❌ Error `ModuleNotFoundError: No module named 'seaborn'` atau `'matplotlib'`
+```bash
+pip install matplotlib seaborn
+```
 
-### ❌ Sheet 4 (Pareto) hanya menampilkan satu atau dua pelanggan
-Analisis Pareto menggunakan hanya data bulan **terakhir** yang tersedia. Jika sheet terakhir memiliki sedikit data atau pelanggan, jumlah baris di sheet ini akan sedikit. Ini bukan error — ini mencerminkan kondisi data aktual bulan terakhir.
+### ❌ Proses sangat lambat di Sheet 9 (One-Class SVM)
+SVM memiliki kompleksitas komputasi O(n²) hingga O(n³). Untuk dataset besar (> 10.000 baris), skrip otomatis mengambil 10.000 sampel untuk training. Jika masih lambat, kurangi `nu` menjadi `0.01` atau ganti kernel menjadi `linear` di `Analisis_Audit_2.py`.
 
-### ❌ Sheet 5 (Duplikasi) kosong / tidak ada temuan duplikat
-Ini adalah kondisi normal dan merupakan hasil yang baik — berarti tidak ada nomor faktur yang diinput ganda dalam bulan yang sama. Sheet tetap dibuat namun berisi header kolom tanpa baris data.
+### ❌ File PNG chart tidak terhapus setelah proses
+Jika skrip dihentikan paksa di tengah jalan, file `temp_chart_*.png` dan `plot_anomaly_*.png` mungkin tersisa di folder `Dapur/`. Hapus secara manual sebelum menjalankan ulang.
 
-### ❌ `Laporan_Analisis_Prosedur_Audit.xlsx` tertimpa setiap run
-Ini adalah perilaku yang disengaja — setiap eksekusi menghasilkan laporan segar. Simpan salinan dengan nama berbeda jika hasil run sebelumnya perlu dipertahankan.
+### ❌ `Terjadi kesalahan saat menjalankan Analisis_Audit_2.py`
+Tahap 1 berhasil, Tahap 2 gagal. Jalankan `Analisis_Audit_2.py` secara manual dari dalam folder `Dapur/` untuk melihat pesan error lengkap:
+```bash
+cd Dapur
+python Analisis_Audit_2.py
+```
+
+### ❌ Seluruh kolom AR aging bernilai 0
+Kolom `Umur AR base on Tgl Faktur` tidak ditemukan. Cek nama kolom di file PTM — setelah `clean_key()`, teks ini menjadi `"umarbaseontglfaktur"`. Pastikan nama kolom mengandung kata yang sama.
 
 ---
 
 ## 📌 Catatan Penting
 
-- **Jalankan dari folder yang berisi file PTM** — Skrip menggunakan `glob("PTM*.xlsx")` yang mencari di direktori kerja saat ini, bukan path absolut.
-- **File output akan ditimpa setiap run** — Tidak ada pengecekan apakah `Laporan_Analisis_Prosedur_Audit.xlsx` sudah ada; file lama langsung diganti.
-- **Z-Score dihitung dari semua data yang tersedia** — Semakin banyak bulan data di file PTM, semakin akurat threshold Z-Score dalam mencerminkan pola historis. Dengan data ≤ 3 bulan, Z-Score kurang bermakna statistik.
-- **Hukum Benford paling efektif untuk dataset besar** — Uji Benford memberikan sinyal yang lebih kuat jika jumlah transaksi di seluruh periode cukup besar (idealnya ≥ 1.000 faktur). Hasil pada dataset kecil perlu diinterpretasikan dengan hati-hati.
-- **Pareto berbasis snapshot bulan terakhir** — Konsentrasi risiko bisa berubah dramatis dari bulan ke bulan. Untuk tren konsentrasi risiko per bulan, gunakan data dari `Monitoring AR Outstanding`.
-- **Duplikasi intra-bulan vs carry-over** — Faktur yang sama muncul di dua bulan berbeda (karena belum lunas) **tidak** dianggap duplikat oleh skrip ini. Hanya kemunculan ganda dalam satu bulan yang sama yang dilaporkan.
-- **Kolom `Kontak Pelanggan` tidak dipakai di skrip ini** — Meskipun dibaca sebagai bagian dari `df_micro_master`, kolom ini tidak digunakan dalam kelima sheet output. Berbeda dengan `Buat_Data.py` yang menggunakannya untuk tabel kontribusi produk.
+- **Urutan eksekusi wajib dijaga** — Selalu jalankan `Buat Analisis Audit.py`, bukan skrip di dalam `Dapur/` secara langsung. Orkestrator yang memindahkan file PTM ke `Dapur/` sebelum kedua skrip dijalankan.
+- **File PTM dipindahkan (bukan disalin)** — `shutil.move()` digunakan, bukan `shutil.copy()`. Setelah proses selesai, file PTM di folder utama akan hilang karena dipindahkan ke `Dapur/` dan kemudian dihapus. **Simpan cadangan file PTM** sebelum menjalankan skrip.
+- **File output akan ditimpa setiap run** — `Laporan_Analisis_Prosedur_Audit.xlsx` lama langsung diganti. Ganti nama file lama jika ingin menyimpannya.
+- **6 metode ML membaca ulang PTM secara mandiri** — `Analisis_Audit_2.py` tidak membaca output Tahap 1, melainkan membaca ulang file PTM dari `Dapur/`. Ini yang membuatnya bisa dijalankan mandiri untuk debugging.
+- **Hasil ML bersifat indikatif, bukan konklusif** — Temuan dari Sheet 6–11 adalah *sinyal awal* yang perlu diverifikasi secara manual. Anomali statistik tidak selalu berarti fraud atau kesalahan.
+- **Membandingkan Sheet 6–11** — Transaksi yang ditandai **anomali oleh beberapa metode sekaligus** memiliki prioritas reviu lebih tinggi dibanding yang hanya ditandai satu metode.
+- **Z-Score paling efektif dengan data banyak bulan** — Dengan ≤ 3 bulan data, Z-Score kurang bermakna. Tambahkan lebih banyak sheet MMYY ke file PTM untuk hasil yang lebih representatif.
+- **Benford paling efektif untuk dataset besar** — Idealnya ≥ 1.000 faktur. Pada dataset kecil, deviasi tinggi bisa muncul hanya karena kebetulan statistik.
 
 ---
 
-## 👤 Author
+## 📜 Lisensi
 
 Proyek ini dikembangkan untuk keperluan internal perusahaan. Silakan sesuaikan dengan kebutuhan organisasi Anda.
 

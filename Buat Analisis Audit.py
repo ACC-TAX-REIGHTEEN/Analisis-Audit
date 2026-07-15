@@ -5,9 +5,9 @@ import glob
 import sys
 
 dapur_dir = "Dapur"
-required_dapur_files = ["Analisis_Audit_1.py", "Analisis_Audit_2.py", "config.conf", "__init__.py"]
+required_dapur_files = ["Analisis_AR.py", "Analisis_Audit_1.py", "Analisis_Audit_2.py", "config.conf", "__init__.py"]
 req_file_pattern = "PTM*.xlsx"
-final_output = "Laporan_Analisis_Prosedur_Audit.xlsx"
+final_outputs = ["Laporan_Analisis_Prosedur_Audit.xlsx", "Monitoring.xlsx"]
 
 missing_items = []
 
@@ -38,7 +38,7 @@ for ext in ['*.xls', '*.xlsx']:
 
 shutil.move(req_file_1, os.path.join(dapur_dir, os.path.basename(req_file_1)))
 
-scripts_to_run = ["Analisis_Audit_1.py", "Analisis_Audit_2.py"]
+scripts_to_run = ["Analisis_AR.py", "Analisis_Audit_1.py", "Analisis_Audit_2.py"]
 current_dir = os.getcwd()
 os.chdir(dapur_dir)
 
@@ -54,12 +54,13 @@ except subprocess.CalledProcessError:
 
 os.chdir(current_dir)
 
-hasil_file = os.path.join(dapur_dir, final_output)
-if os.path.exists(hasil_file):
-    shutil.copy(hasil_file, final_output)
-    print(f"--> File {final_output} berhasil dibuat dan disalin.")
-else:
-    print(f"--> Gagal: File {final_output} tidak ditemukan setelah proses.")
+for output in final_outputs:
+    hasil_file = os.path.join(dapur_dir, output)
+    if os.path.exists(hasil_file):
+        shutil.copy(hasil_file, output)
+        print(f"--> File {output} berhasil dibuat dan disalin.")
+    else:
+        print(f"--> Gagal: File {output} tidak ditemukan setelah proses.")
 
 for ext in ['*.xls', '*.xlsx']:
     for file in glob.glob(os.path.join(dapur_dir, ext)):
